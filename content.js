@@ -78,11 +78,18 @@
 
           const cells = row.querySelectorAll('[role="cell"], .dashboard-table-cell');
           const costCell = cells[cells.length - 1];
-          if (!costCell || costCell.querySelector('.cursor-cost-badge-inline')) return;
+          if (!costCell || costCell.querySelector('.cursor-cost-inline')) return;
 
           const badge = document.createElement('span');
-          badge.className = 'cursor-cost-badge-inline';
+          badge.className = 'cursor-cost-inline';
           badge.textContent = formatCents(cost);
+
+          const parts = [];
+          if (tokenUsage.inputTokens != null) parts.push(`Input: ${tokenUsage.inputTokens.toLocaleString()}`);
+          if (tokenUsage.outputTokens != null) parts.push(`Output: ${tokenUsage.outputTokens.toLocaleString()}`);
+          if (tokenUsage.cacheReadTokens != null) parts.push(`Cache read: ${tokenUsage.cacheReadTokens.toLocaleString()}`);
+          if (tokenUsage.cacheWriteTokens != null) parts.push(`Cache write: ${tokenUsage.cacheWriteTokens.toLocaleString()}`);
+          if (parts.length) badge.title = parts.join('\n');
 
           costCell.appendChild(badge);
           processedRows.add(rowId);
@@ -93,7 +100,7 @@
   const resetState = () => {
     assignedEvents = new Set();
     processedRows = new Set();
-    document.querySelectorAll('.cursor-cost-badge-inline').forEach((el) => el.remove());
+    document.querySelectorAll('.cursor-cost-inline').forEach((el) => el.remove());
   };
 
   const watchForTableChanges = () => {

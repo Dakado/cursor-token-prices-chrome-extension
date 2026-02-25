@@ -1,6 +1,6 @@
-/* Cursor Token Prices Extension - Inline Table Styles */
+/* Cursor Token Prices Extension */
 
-.cursor-cost-badge-inline {
+.cursor-cost-inline {
   display: inline;
   color: var(--text-secondary, #94a3b8);
   font-size: 0.9em;
@@ -8,17 +8,16 @@
   cursor: default;
 }
 
-.cursor-cost-badge-inline::before {
+.cursor-cost-inline::before {
   content: '(';
 }
 
-.cursor-cost-badge-inline::after {
+.cursor-cost-inline::after {
   content: ')';
 }
 
 @media (max-width: 768px) {
-  .cursor-cost-badge-inline {
+  .cursor-cost-inline {
     font-size: 10px;
-    margin-left: 4px;
   }
 }
