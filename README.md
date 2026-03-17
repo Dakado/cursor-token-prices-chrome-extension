@@ -1,5 +1,14 @@
 # Cursor Token Prices Chrome Extension
 
+## Fix for Non-Auto (Default) Model Pricing
+
+This fork fixes a bug where API costs were incorrectly calculated for models using the "default" price model. The original extension only displayed base token costs, but missed the additional API fee that applies to non-auto models.
+
+**What was fixed:**
+- When the price model is "default" (not "auto"), an additional API fee of $0.25 per 1 million tokens is now correctly added to the total cost
+- The calculation now sums all token types (input, output, cache read, cache write) and adds the appropriate API fee
+- This ensures accurate pricing display for all model types on the Cursor Usage page
+
 Shows the actual API costs on the Cursor Usage page – even when included in your current plan. Costs appear as inline text in the usage table and update automatically when day filters are applied.
 
 <img width="976" height="661" alt="image" src="https://github.com/user-attachments/assets/e104ff3c-989a-4e73-b608-28515aa8c71d" />
