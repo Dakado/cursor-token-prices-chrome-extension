@@ -74,7 +74,21 @@
 
           const tokenUsage = ev.tokenUsage;
           if (!tokenUsage) return;
-          const cost = tokenUsage.totalCents ?? 0;
+          
+          // Calculate base cost
+          let cost = tokenUsage.totalCents ?? 0;
+          
+          // Add API fee when price model is not auto: $0.25 per 1 million tokens
+          const model = (ev.model || '').toLowerCase();
+          if (model !== 'auto' && model !== '') {
+            const totalTokens = 
+              (tokenUsage.inputTokens || 0) + 
+              (tokenUsage.outputTokens || 0) + 
+              (tokenUsage.cacheReadTokens || 0) + 
+              (tokenUsage.cacheWriteTokens || 0);
+            const apiFeeCents = (totalTokens / 1000000) * 25; // $0.25 = 25 cents per 1M tokens
+            cost += apiFeeCents;
+          }
 
           const cells = row.querySelectorAll('[role="cell"], .dashboard-table-cell');
           const costCell = cells[cells.length - 1];
