@@ -78,9 +78,9 @@
           // Calculate base cost
           let cost = tokenUsage.totalCents ?? 0;
           
-          // Add API fee when price model is not auto: $0.25 per 1 million tokens
+          // Add API fee when price model is not default: $0.25 per 1 million tokens
           const model = (ev.model || '').toLowerCase();
-          if (model !== 'auto' && model !== '') {
+          if (model !== 'default' && model !== '') {
             const totalTokens = 
               (tokenUsage.inputTokens || 0) + 
               (tokenUsage.outputTokens || 0) + 
