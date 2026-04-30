@@ -71,15 +71,10 @@
     for (const event of store.events) {
       const eventDate = new Date(event.timestamp);
       if (isInCurrentBillingMonth(eventDate, billingDate)) {
-        totalCents += event.tokenUsage?.totalCents || 0;
-        requestCount++;
-      }
-    }
-    
-    // Add API fee for non-default models
-    for (const event of store.events) {
-      const eventDate = new Date(event.timestamp);
-      if (isInCurrentBillingMonth(eventDate, billingDate)) {
+        // Calculate base cost
+        let cost = event.tokenUsage?.totalCents || 0;
+        
+        // Add API fee for non-default models: $0.25 per 1 million tokens
         const model = (event.model || '').toLowerCase();
         if (model !== 'default' && model !== '') {
           const tokenUsage = event.tokenUsage;
@@ -90,9 +85,12 @@
               (tokenUsage.cacheReadTokens || 0) + 
               (tokenUsage.cacheWriteTokens || 0);
             const apiFeeCents = (totalTokens / 1000000) * 25;
-            totalCents += apiFeeCents;
+            cost += apiFeeCents;
           }
         }
+        
+        totalCents += cost;
+        requestCount++;
       }
     }
     
