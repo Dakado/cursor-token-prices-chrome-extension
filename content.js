@@ -106,9 +106,10 @@
     for (const event of store.events) {
       let eventDate = null;
       
-      // Try to parse timestamp from event
+      // Try to parse timestamp from event (convert string to number if needed)
       if (event.timestamp) {
-        eventDate = new Date(event.timestamp);
+        const ts = typeof event.timestamp === 'string' ? parseInt(event.timestamp, 10) : event.timestamp;
+        eventDate = new Date(ts);
       }
       
       // If timestamp is invalid or missing, try to parse from displayDate
@@ -123,7 +124,7 @@
       if (!eventDate || isNaN(eventDate.getTime())) {
         skippedCount++;
         if (skippedCount <= 3) {
-          console.log('Skipping event - invalid date:', { timestamp: event.timestamp, displayDate: event.displayDate });
+          console.log('Skipping event - invalid date:', { timestamp: event.timestamp, displayDate: event.displayDate, parsedTimestamp: typeof event.timestamp === 'string' ? parseInt(event.timestamp, 10) : event.timestamp });
         }
         continue;
       }
