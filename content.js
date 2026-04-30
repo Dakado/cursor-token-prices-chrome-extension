@@ -86,13 +86,22 @@
   };
 
   const calculateMonthlyUsage = () => {
-    if (!store.events.length) return { total: 0, count: 0 };
+    if (!store.events.length) {
+      console.log('No events in store');
+      return { total: 0, count: 0 };
+    }
+    
+    console.log('Processing', store.events.length, 'events');
     
     const billingDate = store.billingDate || parseBillingDate();
     if (billingDate && !isNaN(billingDate.getTime())) store.billingDate = billingDate;
     
+    console.log('Billing date:', billingDate);
+    
     let totalCents = 0;
     let requestCount = 0;
+    let skippedCount = 0;
+    let matchedCount = 0;
     
     for (const event of store.events) {
       let eventDate = null;
@@ -112,21 +121,27 @@
       
       // Skip if we still can't get a valid date
       if (!eventDate || isNaN(eventDate.getTime())) {
+        skippedCount++;
+        if (skippedCount <= 3) {
+          console.log('Skipping event - invalid date:', { timestamp: event.timestamp, displayDate: event.displayDate });
+        }
         continue;
       }
       
-      // Debug: log first event to verify data
-      if (requestCount === 0) {
-        console.log('Monthly usage debug:', { 
+      // Debug: log first few events to verify data
+      if (requestCount < 3) {
+        console.log('Event debug:', { 
           eventDate: eventDate.toISOString(), 
           billingDate: billingDate?.toISOString(),
           timestamp: event.timestamp,
           displayDate: event.displayDate,
-          model: event.model
+          model: event.model,
+          cost: event.tokenUsage?.totalCents
         });
       }
       
       if (isInCurrentBillingMonth(eventDate, billingDate)) {
+        matchedCount++;
         // Calculate base cost
         let cost = event.tokenUsage?.totalCents || 0;
         
@@ -150,7 +165,7 @@
       }
     }
     
-    console.log('Monthly usage calculated:', { totalCents, requestCount });
+    console.log('Monthly usage calculated:', { totalCents, requestCount, matchedCount, skippedCount });
     return { total: totalCents, count: requestCount };
   };
 
@@ -158,6 +173,7 @@
     // Check if panel already exists
     if (document.querySelector('.monthly-usage-panel')) return;
     
+    // Force recalculation to get latest data
     const { total, count } = calculateMonthlyUsage();
     
     // Find the container with the usage panels
