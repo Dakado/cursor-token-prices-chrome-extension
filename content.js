@@ -70,6 +70,16 @@
     
     for (const event of store.events) {
       const eventDate = new Date(event.timestamp);
+      
+      // Debug: log first event to verify data
+      if (requestCount === 0 && event.timestamp) {
+        console.log('Monthly usage debug:', { 
+          eventDate: eventDate.toISOString(), 
+          billingDate: billingDate?.toISOString(),
+          timestamp: event.timestamp
+        });
+      }
+      
       if (isInCurrentBillingMonth(eventDate, billingDate)) {
         // Calculate base cost
         let cost = event.tokenUsage?.totalCents || 0;
@@ -94,6 +104,7 @@
       }
     }
     
+    console.log('Monthly usage calculated:', { totalCents, requestCount });
     return { total: totalCents, count: requestCount };
   };
 
