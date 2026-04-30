@@ -36,20 +36,21 @@
   };
 
   const getMonthlyUsageFromSummary = () => {
-    if (!store.usageSummary) return { total: 0, count: 0 };
+    if (!store.usageSummary) return { total: 0, count: 0, percentUsed: 0 };
     
     const summary = store.usageSummary;
     const individualUsage = summary.individualUsage?.plan;
     
-    if (!individualUsage) return { total: 0, count: 0 };
+    if (!individualUsage) return { total: 0, count: 0, percentUsed: 0 };
     
     // The breakdown.total includes included + bonus tokens (in dollars * 100)
     // From the example: breakdown.total = 5903 means $59.03
     const totalCents = individualUsage.breakdown?.total || 0;
+    const percentUsed = individualUsage.totalPercentUsed || 0;
     
     // We don't have exact request count from the summary, but we can estimate
     // or leave it as 0 if not available. For now, we'll show the dollar amount.
-    return { total: totalCents, count: 0 };
+    return { total: totalCents, count: 0, percentUsed: percentUsed };
   };
 
   const parseBillingDate = () => {
@@ -214,10 +215,12 @@
     // Try to get usage from API summary first, fallback to table calculation
     let total = 0;
     let count = 0;
+    let percentUsed = 0;
     
     const summaryData = getMonthlyUsageFromSummary();
     if (summaryData.total > 0) {
       total = summaryData.total;
+      percentUsed = summaryData.percentUsed || 0;
       // We don't have request count from summary, so we still calculate it from events
       const eventCount = calculateMonthlyUsage();
       count = eventCount.count;
@@ -241,6 +244,9 @@
     panel.className = 'monthly-usage-panel rounded-[12px] bg-elevated shadow-[0_0_0_1px_var(--border-quaternary)] flex min-w-0 flex-1 basis-[300px] flex-col gap-4 p-4 w-full col-span-1 md:col-span-6 lg:col-span-12';
     panel.style.width = '100%';
     
+    // Calculate progress bar width based on percent used
+    const progressBarWidth = Math.min(100, Math.max(0, percentUsed));
+    
     panel.innerHTML = `
       <div class="flex w-full min-w-0 flex-col gap-2">
         <div class="text-base font-medium opacity-50">Total Monthly Usage</div>
@@ -249,13 +255,13 @@
           <div class="text-xl text-tertiary truncate font-medium">(${count} requests)</div>
         </div>
         <div class="flex h-1 w-full gap-px ">
-          <div class="bg-[var(--color-dashboard-usage-accent)]" style="width: 100%; height: 4px; border-radius: 1px;"></div>
+          <div class="bg-[var(--color-dashboard-usage-accent)]" style="width: ${progressBarWidth}%; height: 4px; border-radius: 1px;"></div>
           <div class="flex-grow bg-[var(--color-dashboard-usage-accent-10)]" style="height: 4px;"></div>
         </div>
       </div>
       <div class="text-base text-tertiary">
         <div class="flex items-center gap-1">
-          ${resetDateStr}
+          ${percentUsed > 0 ? `${percentUsed.toFixed(1)}% of included usage used` : resetDateStr}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info h-3 w-3 cursor-help" aria-hidden="true">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M12 16v-4"></path>
