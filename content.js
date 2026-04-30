@@ -59,24 +59,70 @@
     return eventDate >= cycleStart && eventDate < nextCycleStart;
   };
 
+  const parseTableDate = (dateStr, year) => {
+    // Parse date format like "Apr 30, 07:50 AM" to Date object
+    if (!dateStr) return null;
+    
+    try {
+      // Match patterns like "Apr 30, 07:50 AM" or "Apr 30, 07:50 AM GMT+2"
+      const match = dateStr.match(/(\w+)\s+(\d+),\s+(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return null;
+      
+      const [, monthName, day, hour, minute, ampm] = match;
+      const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+      const month = months[monthName.toLowerCase().slice(0, 3)];
+      
+      if (month === undefined) return null;
+      
+      let hours = parseInt(hour, 10);
+      if (ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+      if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      
+      const currentYear = year || new Date().getFullYear();
+      return new Date(currentYear, month, parseInt(day, 10), hours, parseInt(minute, 10));
+    } catch (e) {
+      return null;
+    }
+  };
+
   const calculateMonthlyUsage = () => {
     if (!store.events.length) return { total: 0, count: 0 };
     
     const billingDate = store.billingDate || parseBillingDate();
-    if (billingDate) store.billingDate = billingDate;
+    if (billingDate && !isNaN(billingDate.getTime())) store.billingDate = billingDate;
     
     let totalCents = 0;
     let requestCount = 0;
     
     for (const event of store.events) {
-      const eventDate = new Date(event.timestamp);
+      let eventDate = null;
+      
+      // Try to parse timestamp from event
+      if (event.timestamp) {
+        eventDate = new Date(event.timestamp);
+      }
+      
+      // If timestamp is invalid or missing, try to parse from displayDate
+      if (!eventDate || isNaN(eventDate.getTime())) {
+        if (event.displayDate) {
+          const year = billingDate ? billingDate.getFullYear() : new Date().getFullYear();
+          eventDate = parseTableDate(event.displayDate, year);
+        }
+      }
+      
+      // Skip if we still can't get a valid date
+      if (!eventDate || isNaN(eventDate.getTime())) {
+        continue;
+      }
       
       // Debug: log first event to verify data
-      if (requestCount === 0 && event.timestamp) {
+      if (requestCount === 0) {
         console.log('Monthly usage debug:', { 
           eventDate: eventDate.toISOString(), 
           billingDate: billingDate?.toISOString(),
-          timestamp: event.timestamp
+          timestamp: event.timestamp,
+          displayDate: event.displayDate,
+          model: event.model
         });
       }
       
