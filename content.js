@@ -2,17 +2,54 @@
 (function () {
   'use strict';
 
-  const store = { events: [], billingDate: null };
+  const store = { events: [], billingDate: null, usageSummary: null };
   let assignedEvents = new Set();
   let processedRows = new Set();
   let observer = null;
   let retryInterval = null;
-
+  
   const formatCents = (cents) => {
     if (cents == null) return '-';
     if (cents === 0) return '$0.00';
     const dollars = cents / 100;
     return dollars < 0.01 ? `$${dollars.toFixed(3)}` : `$${dollars.toFixed(2)}`;
+  };
+
+  const fetchUsageSummary = async () => {
+    try {
+      const response = await fetch('/api/usage-summary');
+      if (!response.ok) throw new Error('Failed to fetch usage summary');
+      const data = await response.json();
+      store.usageSummary = data;
+      
+      // Extract billing cycle end date
+      if (data.billingCycleEnd) {
+        store.billingDate = new Date(data.billingCycleEnd);
+      }
+      
+      console.log('Usage summary fetched:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching usage summary:', error);
+      return null;
+    }
+  };
+
+  const getMonthlyUsageFromSummary = () => {
+    if (!store.usageSummary) return { total: 0, count: 0 };
+    
+    const summary = store.usageSummary;
+    const individualUsage = summary.individualUsage?.plan;
+    
+    if (!individualUsage) return { total: 0, count: 0 };
+    
+    // The breakdown.total includes included + bonus tokens (in dollars * 100)
+    // From the example: breakdown.total = 5903 means $59.03
+    const totalCents = individualUsage.breakdown?.total || 0;
+    
+    // We don't have exact request count from the summary, but we can estimate
+    // or leave it as 0 if not available. For now, we'll show the dollar amount.
+    return { total: totalCents, count: 0 };
   };
 
   const parseBillingDate = () => {
@@ -174,8 +211,22 @@
     // Check if panel already exists
     if (document.querySelector('.monthly-usage-panel')) return;
     
-    // Force recalculation to get latest data
-    const { total, count } = calculateMonthlyUsage();
+    // Try to get usage from API summary first, fallback to table calculation
+    let total = 0;
+    let count = 0;
+    
+    const summaryData = getMonthlyUsageFromSummary();
+    if (summaryData.total > 0) {
+      total = summaryData.total;
+      // We don't have request count from summary, so we still calculate it from events
+      const eventCount = calculateMonthlyUsage();
+      count = eventCount.count;
+    } else {
+      // Fallback to table calculation if summary not available
+      const eventData = calculateMonthlyUsage();
+      total = eventData.total;
+      count = eventData.count;
+    }
     
     // Find the container with the usage panels
     const usageContainer = document.querySelector('.flex.flex-wrap.gap-6');
@@ -364,19 +415,26 @@
   };
 
   // Initialize
-  window.addEventListener('cursor-usage-data', (e) => processApiResponse(e.detail));
+  const init = async () => {
+    // Fetch usage summary from API first
+    await fetchUsageSummary();
+    
+    window.addEventListener('cursor-usage-data', (e) => processApiResponse(e.detail));
 
-  if (window.__cursorUsageData?.events?.length) {
-    processApiResponse(window.__cursorUsageData);
-    return;
-  }
-
-  const interval = setInterval(() => {
     if (window.__cursorUsageData?.events?.length) {
       processApiResponse(window.__cursorUsageData);
-      clearInterval(interval);
+      return;
     }
-  }, 500);
 
-  setTimeout(() => clearInterval(interval), 30000);
+    const interval = setInterval(() => {
+      if (window.__cursorUsageData?.events?.length) {
+        processApiResponse(window.__cursorUsageData);
+        clearInterval(interval);
+      }
+    }, 500);
+
+    setTimeout(() => clearInterval(interval), 30000);
+  };
+  
+  init();
 })();
