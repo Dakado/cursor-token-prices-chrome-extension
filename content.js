@@ -3,8 +3,6 @@
   'use strict';
 
   const store = { events: [], billingDate: null, usageSummary: null };
-  let assignedEvents = new Set();
-  let processedRows = new Set();
   let observer = null;
   let retryInterval = null;
   
@@ -48,8 +46,6 @@
     const totalCents = individualUsage.breakdown?.total || 0;
     const percentUsed = individualUsage.totalPercentUsed || 0;
     
-    // We don't have exact request count from the summary, but we can estimate
-    // or leave it as 0 if not available. For now, we'll show the dollar amount.
     return { total: totalCents, count: 0, percentUsed: percentUsed };
   };
 
@@ -275,110 +271,7 @@
     usageContainer.appendChild(panel);
   };
 
-  const getRowId = (row, index) => {
-    const ts = row.querySelector('[title*="Feb"], [title*="Jan"], [title*="2026"]');
-    if (ts) return ts.getAttribute('title') || ts.textContent;
-    const text = row.textContent?.substring(0, 100);
-    return text ? `${index}-${text}` : null;
-  };
-
-  const findMatchingEvent = (rowText, rowIndex) => {
-    if (!store.events.length) return null;
-
-    // Match by position (both sorted newest first)
-    if (rowIndex > 0 && rowIndex <= store.events.length) {
-      const ev = store.events[rowIndex - 1];
-      if (ev && !assignedEvents.has(ev.timestamp)) {
-        assignedEvents.add(ev.timestamp);
-        return ev;
-      }
-    }
-
-    // Fallback: match by model
-    const match = rowText.match(/(kimi-k2\.5|gpt-5\.3-codex[^\s]*|claude-4\.6-opus[^\s]*|composer-1[^\s]*|auto)/i);
-    const rowModel = match?.[1].toLowerCase();
-
-    if (rowModel) {
-      for (const ev of store.events) {
-        if ((ev.model || '').toLowerCase().includes(rowModel) && !assignedEvents.has(ev.timestamp)) {
-          assignedEvents.add(ev.timestamp);
-          return ev;
-        }
-      }
-    }
-
-    // Last resort: first unassigned
-    for (const ev of store.events) {
-      if (!assignedEvents.has(ev.timestamp)) {
-        assignedEvents.add(ev.timestamp);
-        return ev;
-      }
-    }
-    return null;
-  };
-
-  const injectIntoTable = () => {
-    if (!store.events.length) return;
-
-    document
-      .querySelectorAll('.dashboard-table-rows, [role="rowgroup"], .dashboard-table-container')
-      .forEach((container) => {
-        container.querySelectorAll('[role="row"], .dashboard-table-row').forEach((row, idx) => {
-          if (row.querySelector('[role="columnheader"], .dashboard-table-header')) return;
-
-          const rowId = getRowId(row, idx);
-          if (!rowId || processedRows.has(rowId)) return;
-
-          const ev = findMatchingEvent(row.textContent || '', idx);
-          if (!ev) return;
-
-          const tokenUsage = ev.tokenUsage;
-          if (!tokenUsage) return;
-          
-          // Calculate base cost
-          let cost = tokenUsage.totalCents ?? 0;
-          
-          // Add API fee when price model is not default: $0.25 per 1 million tokens
-          const model = (ev.model || '').toLowerCase();
-          if (model !== 'default' && model !== '') {
-            const totalTokens = 
-              (tokenUsage.inputTokens || 0) + 
-              (tokenUsage.outputTokens || 0) + 
-              (tokenUsage.cacheReadTokens || 0) + 
-              (tokenUsage.cacheWriteTokens || 0);
-            const apiFeeCents = (totalTokens / 1000000) * 25; // $0.25 = 25 cents per 1M tokens
-            cost += apiFeeCents;
-          }
-
-          const cells = row.querySelectorAll('[role="cell"], .dashboard-table-cell');
-          const costCell = cells[cells.length - 1];
-          if (!costCell || costCell.querySelector('.cursor-cost-inline')) return;
-
-          const badge = document.createElement('span');
-          badge.className = 'cursor-cost-inline';
-          badge.textContent = formatCents(cost);
-
-          const parts = [];
-          if (tokenUsage.inputTokens != null) parts.push(`Input: ${tokenUsage.inputTokens.toLocaleString()}`);
-          if (tokenUsage.outputTokens != null) parts.push(`Output: ${tokenUsage.outputTokens.toLocaleString()}`);
-          if (tokenUsage.cacheReadTokens != null) parts.push(`Cache read: ${tokenUsage.cacheReadTokens.toLocaleString()}`);
-          if (tokenUsage.cacheWriteTokens != null) parts.push(`Cache write: ${tokenUsage.cacheWriteTokens.toLocaleString()}`);
-          if (parts.length) badge.title = parts.join('\n');
-
-          costCell.appendChild(badge);
-          processedRows.add(rowId);
-        });
-      });
-  };
-
-  const resetState = () => {
-    assignedEvents = new Set();
-    processedRows = new Set();
-    document.querySelectorAll('.cursor-cost-inline').forEach((el) => el.remove());
-  };
-
   const watchForTableChanges = () => {
-    injectIntoTable();
     injectMonthlyUsagePanel();
 
     if (!observer) {
@@ -392,7 +285,6 @@
           )
         );
         if (shouldInject) {
-          injectIntoTable();
           injectMonthlyUsagePanel();
         }
       });
@@ -402,7 +294,6 @@
     if (retryInterval) clearInterval(retryInterval);
     let attempts = 0;
     retryInterval = setInterval(() => {
-      injectIntoTable();
       injectMonthlyUsagePanel();
       if (++attempts >= 10) clearInterval(retryInterval);
     }, 500);
@@ -414,7 +305,6 @@
     const events = data.events || data.usageEventsDisplay || [];
     if (!events.length) return;
 
-    resetState();
     store.events = events;
 
     watchForTableChanges();
